@@ -3,7 +3,7 @@
 Bus::Bus()
 {
 	// Clear RAM contents, just in case
-	for (auto& i : ram) i = 0x00;
+	for (auto& i : cpuRam) i = 0x00;
 
 	cpu.ConnectBus(this);
 }
@@ -12,16 +12,46 @@ Bus::~Bus()
 {
 }
 
-void Bus::write(uint16_t addr, uint8_t data)
+void Bus::cpuWrite(uint16_t addr, uint8_t data)
 {
-	if (addr >= 0x0000 && addr <= 0xFFFF)
-		ram[addr] = data;
+	if (addr >= 0x0000 && addr <= 0x1FFF)
+	{
+		cpuRam[addr & 0x07FF] = data;
+	}
+	else if (addr >= 0x2000 && addr <= 0x3FFF)
+	{
+		ppu.cpuWrite(addr & 0x007, data);
+	}
 }
 
-uint8_t Bus::read(uint16_t addr, bool bReadOnly)
+uint8_t Bus::cpuRead(uint16_t addr, bool bReadOnly)
 {
-	if (addr >= 0x0000 && addr <= 0xFFFF)
-		return ram[addr];
+	uint8_t data = 0x00;
 
-	return 0x00;
+	if (addr >= 0x0000 && addr <= 0x1FFF)
+	{
+		return cpuRam[addr & 0x07FF];
+	}
+	else if (addr >= 0x2000 && addr <= 0x3FFF)
+	{
+		data = ppu.cpuRead(addr & 0x007, bReadOnly);
+	}
+
+	return data;
+}
+
+void Bus::insertCartridge(const std::shared_ptr<Cartridge>& cartridge)
+{
+	this->cart = cartridge;
+	ppu.ConnectCartridge(cartridge);
+}
+
+void Bus::reset()
+{
+	cpu.reset();
+	nSystemClockCounter = 0;
+}
+
+void Bus::clock()
+{
 }
