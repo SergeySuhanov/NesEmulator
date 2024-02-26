@@ -9,6 +9,12 @@ public:
 	olc2C02();
 	~olc2C02();
 
+private:
+	uint8_t tblName[2][1024];
+	uint8_t tblPalette[32];
+	uint8_t tblPattern[2][4096];  // Javid Future Custom Mapper 
+
+public:
 	// Communications with Main Bus
 	uint8_t cpuRead(uint16_t addr, bool rdonly = false);
 	void    cpuWrite(uint16_t addr, uint8_t data);
