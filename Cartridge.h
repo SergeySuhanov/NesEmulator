@@ -1,9 +1,12 @@
 #pragma once
 #include <cstdint>
+#include <vector>
+#include "Mapper_000.h"
+
 class Cartridge
 {
 public:
-	Cartridge();
+	Cartridge(const std::string& sFileName);
 	~Cartridge();
 
 private:
@@ -13,6 +16,8 @@ private:
 	uint8_t nMapperID = 0;
 	uint8_t nPRGBanks = 0;
 	uint8_t nCHRBanks = 0;
+
+	std::shared_ptr<Mapper> pMapper;
 
 public:
 	// Communication with Main Bus
