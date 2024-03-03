@@ -2,9 +2,6 @@
 
 Bus::Bus()
 {
-	// Clear RAM contents, just in case
-	for (auto& i : cpuRam) i = 0x00;
-
 	cpu.ConnectBus(this);
 }
 
@@ -62,4 +59,10 @@ void Bus::reset()
 
 void Bus::clock()
 {
+	ppu.clock();
+	if (nSystemClockCounter % 3 == 0)
+	{
+		cpu.clock();
+	}
+	nSystemClockCounter++;
 }

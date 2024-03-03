@@ -1,5 +1,5 @@
 #include "Cartridge.h"
-#include <fstream>
+//#include <fstream>
 
 Cartridge::Cartridge(const std::string& sFileName)
 {
@@ -44,8 +44,8 @@ Cartridge::Cartridge(const std::string& sFileName)
 			vPRGMemory.resize(nPRGBanks * 16384);
 			ifs.read((char*)vPRGMemory.data(), vPRGMemory.size());
 
-			nCHRBanks = header.prg_rom_chunks;
-			vPRGMemory.resize(nCHRBanks * 8192);
+			nCHRBanks = header.chr_rom_chunks;
+			vCHRMemory.resize(nCHRBanks * 8192);
 			ifs.read((char*)vCHRMemory.data(), vCHRMemory.size());
 		}
 

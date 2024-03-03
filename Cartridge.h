@@ -1,7 +1,10 @@
 #pragma once
 #include <cstdint>
+#include <string>
+#include <fstream>
 #include <vector>
 #include "Mapper_000.h"
+//#include <string>
 
 class Cartridge
 {

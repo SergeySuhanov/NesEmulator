@@ -22,7 +22,7 @@ public: // Devices on bus
 	std::shared_ptr<Cartridge> cart;
 
 	// Fake RAM for this part of the series
-	std::array<uint8_t, 2048> cpuRam;
+	uint8_t cpuRam[2048];
 
 public: // Bus read & write
 	void cpuWrite(uint16_t addr, uint8_t data);
