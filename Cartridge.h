@@ -4,7 +4,6 @@
 #include <fstream>
 #include <vector>
 #include "Mapper_000.h"
-//#include <string>
 
 class Cartridge
 {

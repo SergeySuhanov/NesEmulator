@@ -93,6 +93,10 @@ uint8_t olc2C02::cpuRead(uint16_t addr, bool rdonly)
 	case 0x0001: // Mask
 		break;
 	case 0x0002: // Status
+		status.vertical_blank = 1;
+		data = (status.reg & 0xE0) | (ppu_data_buffer & 0x1F);
+		status.vertical_blank = 0;
+		address_latch = 0;
 		break;
 	case 0x0003: // OAM Address
 		break;
@@ -103,6 +107,10 @@ uint8_t olc2C02::cpuRead(uint16_t addr, bool rdonly)
 	case 0x0006: // PPU Address
 		break;
 	case 0x0007: // PPU Data
+		data = ppu_data_buffer;
+		ppu_data_buffer = ppuRead(ppu_address);
+
+		if (ppu_address > 0x3F00) data = ppu_data_buffer;
 		break;
 	}
 
@@ -114,8 +122,10 @@ void olc2C02::cpuWrite(uint16_t addr, uint8_t data)
 	switch (addr)
 	{
 	case 0x0000: // Control
+		control.reg = data;
 		break;
 	case 0x0001: // Mask
+		mask.reg = data;
 		break;
 	case 0x0002: // Status
 		break;
@@ -126,8 +136,19 @@ void olc2C02::cpuWrite(uint16_t addr, uint8_t data)
 	case 0x0005: // Scroll
 		break;
 	case 0x0006: // PPU Address
+		if (address_latch == 0)
+		{
+			ppu_address = (ppu_address & 0x00FF) | (data << 8);
+			address_latch = 1;
+		}
+		else
+		{
+			ppu_address = (ppu_address & 0xFF00) | data;
+			address_latch = 0;
+		}
 		break;
 	case 0x0007: // PPU Data
+		///ppuWrite();
 		break;
 	}
 }
@@ -141,6 +162,22 @@ uint8_t olc2C02::ppuRead(uint16_t addr, bool rdonly)
 	{
 
 	}
+	else if (addr >= 0x0000 && addr <= 0x1FFF)
+	{
+		data = tblPattern[(addr & 0x1000) >> 12][addr & 0x0FFF];
+	}
+	else if (addr >= 0x2000 && addr <= 0x3EFF)
+	{
+	}
+	else if (addr >= 0x3F00 && addr <= 0x3FFF)
+	{
+		addr &= 0x001F;
+		if (addr == 0x0010) addr = 0x0000;
+		if (addr == 0x0014) addr = 0x0004;
+		if (addr == 0x0018) addr = 0x0008;
+		if (addr == 0x001C) addr = 0x000C;
+		data = tblPalette[addr];
+	}
 
     return data;
 }
@@ -152,6 +189,22 @@ void olc2C02::ppuWrite(uint16_t addr, uint8_t data)
 	if (cart->ppuWrite(addr, data))
 	{
 
+	}
+	else if (addr >= 0x0000 && addr <= 0x1FFF)
+	{
+		tblPattern[(addr & 0x1000) >> 12][addr & 0x0FFF] = data;
+	}
+	else if (addr >= 0x2000 && addr <= 0x3EFF)
+	{
+	}
+	else if (addr >= 0x3F00 && addr <= 0x3FFF)
+	{
+		addr &= 0x001F;
+		if (addr == 0x0010) addr = 0x0000;
+		if (addr == 0x0014) addr = 0x0004;
+		if (addr == 0x0018) addr = 0x0008;
+		if (addr == 0x001C) addr = 0x000C;
+		tblPalette[addr] = data;
 	}
 }
 
@@ -187,7 +240,40 @@ olc::Sprite& olc2C02::GetNameTable(uint8_t i)
 	return *sprNameTable[i];
 }
 
-olc::Sprite& olc2C02::GetPatternTable(uint8_t i)
+olc::Sprite& olc2C02::GetPatternTable(uint8_t i, uint8_t palette)
 {
+	for (uint16_t nTileY = 0; nTileY < 16; nTileY++)
+	{
+		for (uint16_t nTileX = 0; nTileX < 16; nTileX++)
+		{
+			uint16_t nOffset = nTileY * 256 + nTileX * 16;
+
+			for (uint16_t row = 0; row < 8; row++)
+			{
+				uint8_t tile_lsb = ppuRead(i * 0x1000 + nOffset + row);
+				uint8_t tile_msb = ppuRead(i * 0x1000 + nOffset + row + 0x0008);
+
+				for (uint16_t col = 0; col < 8; col++)
+				{
+					uint8_t pixel = (tile_lsb & 0x01) + (tile_msb & 0x01);
+					tile_lsb >>= 1;
+					tile_msb >>= 1;
+
+					sprPatternTable[i]->SetPixel
+					(
+						nTileX * 8 + (7 - col),
+						nTileY * 8 + row,
+						GetColourFromPaletteRam(palette, pixel)
+					);
+				}
+			}
+		}
+	}
+
 	return *sprPatternTable[i];
+}
+
+olc::Pixel& olc2C02::GetColourFromPaletteRam(uint8_t palette, uint8_t pixel)
+{
+	return palScreen[ppuRead(0x3F00 + (palette << 2) + pixel)];
 }
