@@ -93,7 +93,6 @@ uint8_t olc2C02::cpuRead(uint16_t addr, bool rdonly)
 	case 0x0001: // Mask
 		break;
 	case 0x0002: // Status
-		status.vertical_blank = 1;
 		data = (status.reg & 0xE0) | (ppu_data_buffer & 0x1F);
 		status.vertical_blank = 0;
 		address_latch = 0;
@@ -111,6 +110,7 @@ uint8_t olc2C02::cpuRead(uint16_t addr, bool rdonly)
 		ppu_data_buffer = ppuRead(ppu_address);
 
 		if (ppu_address > 0x3F00) data = ppu_data_buffer;
+		ppu_address++;
 		break;
 	}
 
@@ -148,7 +148,8 @@ void olc2C02::cpuWrite(uint16_t addr, uint8_t data)
 		}
 		break;
 	case 0x0007: // PPU Data
-		///ppuWrite();
+		ppuWrite(ppu_address, data);
+		ppu_address++;
 		break;
 	}
 }
@@ -215,6 +216,19 @@ void olc2C02::ConnectCartridge(const std::shared_ptr<Cartridge>& cartridge)
 
 void olc2C02::clock()
 {
+	if (scanline == -1 && cycle == 1)
+	{
+		status.vertical_blank = 0;
+	}
+
+	if (scanline == 241 && cycle == 1)
+	{
+		status.vertical_blank = 1;
+		if (control.enable_nmi)
+			nmi = true;
+	}
+
+
 	sprScreen->SetPixel(cycle - 1, scanline, palScreen[(rand() % 2) ? 0x3F : 0x30]);
 
 	cycle++;
