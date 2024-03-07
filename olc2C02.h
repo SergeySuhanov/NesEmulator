@@ -11,8 +11,8 @@ public:
 	olc2C02();
 	~olc2C02();
 
-private:
 	uint8_t tblName[2][1024];
+private:
 	uint8_t tblPalette[32];
 	uint8_t tblPattern[2][4096];  // Javid Future Custom Mapper 
 
@@ -107,6 +107,30 @@ private:
 
 	uint8_t address_latch = 0x00;
 	uint8_t ppu_data_buffer = 0x00;
-	uint16_t ppu_address = 0x0000;
+	
+	union loopy_register
+	{
+		struct
+		{
+			uint16_t coarse_x : 5;
+			uint16_t coarse_y : 5;
+			uint16_t nametable_x : 1;
+			uint16_t nametable_y : 1;
+			uint16_t fine_y : 1;
+			uint16_t unused : 1;
+		};
+
+		uint16_t reg = 0x0000;
+	};
+
+	loopy_register vram_addr;
+	loopy_register tram_addr;
+
+	uint8_t fine_x = 0x00;
+
+	uint8_t bg_next_tile_id = 0x00;
+	uint8_t bg_next_tile_attrib = 0x00;
+	uint8_t bg_next_tile_lsb = 0x00;
+	uint8_t bg_next_tile_msb = 0x00;
 };
 
