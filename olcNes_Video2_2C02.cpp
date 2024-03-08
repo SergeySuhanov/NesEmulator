@@ -161,7 +161,7 @@ private:
 	bool OnUserCreate()
 	{
 		// Load the cartridge
-		cart = std::make_shared<Cartridge>("nestest.nes");
+		cart = std::make_shared<Cartridge>("DonkeyKong.nes");
 		/*if (!cart->ImageValid())
 			return false;*/
 
@@ -180,6 +180,10 @@ private:
 	{
 		Clear(olc::DARK_BLUE);
 		
+		if (GetKey(olc::Key::SPACE).bPressed) bEmulationRun = !bEmulationRun;
+		if (GetKey(olc::Key::R).bPressed) nes.reset();
+		if (GetKey(olc::Key::P).bPressed) (++nSelectedPalette) &= 0x07;
+
 		if (bEmulationRun)
 		{
 			if (fResidualTime > 0.0f)
@@ -216,12 +220,6 @@ private:
 			}
 		}
 
-
-		if (GetKey(olc::Key::SPACE).bPressed) bEmulationRun = !bEmulationRun;
-		if (GetKey(olc::Key::R).bPressed) nes.reset();		
-
-		if (GetKey(olc::Key::P).bPressed) (++nSelectedPalette) &= 0x07;
-
 		DrawCpu(516, 2);
 		DrawCode(516, 72, 26);
 
@@ -241,15 +239,15 @@ private:
 
 		DrawSprite(0, 0, &nes.ppu.GetScreen(), 2);
 
-		for (uint8_t y = 0; y < 30; y++)
-		{
-			for (uint8_t x = 0; x < 32; x++)
-			{
-				//DrawString(x * 16, y * 16, hex((uint32_t)nes.ppu.tblName[0][y * 32 + x], 2));
-				uint8_t id = (uint32_t)nes.ppu.tblName[0][y * 32 + x];
-				DrawPartialSprite(x * 16, y * 16, &nes.ppu.GetPatternTable(0, nSelectedPalette), (id & 0x0F) << 3, ((id >> 4) & 0x0F) << 3, 8, 8, 2);
-			}
-		}
+		//for (uint8_t y = 0; y < 30; y++)
+		//{
+		//	for (uint8_t x = 0; x < 32; x++)
+		//	{
+		//		//DrawString(x * 16, y * 16, hex((uint32_t)nes.ppu.tblName[0][y * 32 + x], 2));
+		//		uint8_t id = (uint32_t)nes.ppu.tblName[0][y * 32 + x];
+		//		DrawPartialSprite(x * 16, y * 16, &nes.ppu.GetPatternTable(0, nSelectedPalette), (id & 0x0F) << 3, ((id >> 4) & 0x0F) << 3, 8, 8, 2);
+		//	}
+		//}
 
 		return true;
 	}

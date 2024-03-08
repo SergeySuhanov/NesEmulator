@@ -152,7 +152,7 @@ void olc2C02::cpuWrite(uint16_t addr, uint8_t data)
 	case 0x0006: // PPU Address
 		if (address_latch == 0)
 		{
-			tram_addr.reg = (tram_addr.reg & 0x00FF) | (data << 8);
+			tram_addr.reg = (tram_addr.reg & 0x00FF) | (uint16_t)((data & 0x3F) << 8);
 			address_latch = 1;
 		}
 		else
@@ -216,7 +216,7 @@ uint8_t olc2C02::ppuRead(uint16_t addr, bool rdonly)
 		if (addr == 0x0014) addr = 0x0004;
 		if (addr == 0x0018) addr = 0x0008;
 		if (addr == 0x001C) addr = 0x000C;
-		data = tblPalette[addr];
+		data = tblPalette[addr] & (mask.grayscale ? 0x30 : 0x3F);
 	}
 
     return data;
@@ -279,6 +279,90 @@ void olc2C02::ConnectCartridge(const std::shared_ptr<Cartridge>& cartridge)
 
 void olc2C02::clock()
 {
+	auto IncrementScrollX = [&]()
+		{
+			if (mask.render_background || mask.render_sprites)
+			{
+				if (vram_addr.coarse_x == 31)
+				{
+					vram_addr.coarse_x = 0;
+					vram_addr.nametable_x = ~vram_addr.nametable_x;
+				}
+				else
+				{
+					vram_addr.coarse_x++;
+				}
+			}
+
+		};
+
+	auto IncrementScrollY = [&]()
+		{
+			if (mask.render_background || mask.render_sprites)
+			{
+				if (vram_addr.coarse_y < 7)
+				{
+					vram_addr.fine_y++;
+				}
+				else
+				{
+					vram_addr.fine_y = 0;
+
+					if (vram_addr.coarse_y == 29)
+					{
+						vram_addr.coarse_y = 0;
+						vram_addr.nametable_y = ~vram_addr.nametable_y;
+					}
+					else if (vram_addr.coarse_y == 31)
+					{
+						vram_addr.coarse_y = 0;
+					}
+					else
+					{
+						vram_addr.coarse_y++;
+					}
+				}
+			}
+		};
+
+	auto TransferAddressX = [&]()
+		{
+			if (mask.render_background || mask.render_sprites)
+			{
+				vram_addr.nametable_x = tram_addr.nametable_x;
+				vram_addr.coarse_x = tram_addr.coarse_x;
+			}
+		};
+
+	auto TransferAddressY = [&]()
+		{
+			if (mask.render_background || mask.render_sprites)
+			{
+				vram_addr.fine_y = tram_addr.fine_y;
+				vram_addr.nametable_y = tram_addr.nametable_y;
+				vram_addr.coarse_y = tram_addr.coarse_y;
+			}
+		};
+
+	auto LoadBackgroundShifters = [&]()
+		{
+			bg_shifter_pattern_lo = (bg_shifter_pattern_lo & 0xFF00) | bg_next_tile_lsb;
+			bg_shifter_pattern_hi = (bg_shifter_pattern_hi & 0xFF00) | bg_next_tile_msb;
+			bg_shifter_attrib_lo = (bg_shifter_attrib_lo & 0xFF00) | ((bg_next_tile_attrib & 0b01) ? 0xFF : 0x00);
+			bg_shifter_attrib_hi = (bg_shifter_attrib_hi & 0xFF00) | ((bg_next_tile_attrib & 0b10) ? 0xFF : 0x00);
+		};
+
+	auto UpdateShifters = [&]()
+		{
+			if (mask.render_background)
+			{
+				bg_shifter_pattern_lo <<= 1;
+				bg_shifter_pattern_hi <<= 1;
+				bg_shifter_attrib_lo <<= 1;
+				bg_shifter_attrib_hi <<= 1;
+			}
+		};
+
 	if (scanline >= -1 && scanline < 240)
 	{
 		if (scanline == -1 && cycle == 1)
@@ -288,9 +372,12 @@ void olc2C02::clock()
 
 		if ((cycle >= 2 && cycle < 258) || (cycle >= 321 && cycle < 338))
 		{
+			UpdateShifters();
+
 			switch ((cycle - 1) % 8)
 			{
 			case 0:
+				LoadBackgroundShifters();
 				bg_next_tile_id = ppuRead(0x2000 | (vram_addr.reg & 0x0FFF));
 				break;
 			case 2:
@@ -312,15 +399,31 @@ void olc2C02::clock()
 					+ ((uint16_t)bg_next_tile_id << 4)
 					+ (vram_addr.fine_y) + 8);
 			case 7:
+				IncrementScrollX();
+				break;
 			}
 		}
 
 		if (cycle == 256)
 		{
+			IncrementScrollY();
+		}
 
+		if (cycle == 257)
+		{
+			TransferAddressX();
+		}
+
+		if (scanline == -1 && cycle >= 280 && cycle < 305)
+		{
+			TransferAddressY();
 		}
 	}
 	
+	if (scanline == 240)
+	{
+		// Post-Render Scanline - Do Nothing
+	}
 
 	if (scanline == 241 && cycle == 1)
 	{
@@ -330,7 +433,23 @@ void olc2C02::clock()
 	}
 
 
-	//sprScreen->SetPixel(cycle - 1, scanline, palScreen[(rand() % 2) ? 0x3F : 0x30]);
+	uint8_t bg_pixel = 0x00;
+	uint8_t bg_palette = 0x00;
+
+	if (mask.render_background)
+	{
+		uint16_t bit_mux = 0x8000 >> fine_x;
+
+		uint8_t p0_pixel = (bg_shifter_pattern_lo & bit_mux) > 0;
+		uint8_t p1_pixel = (bg_shifter_pattern_hi & bit_mux) > 0;
+		bg_pixel = (p1_pixel << 1) | p0_pixel;
+
+		uint8_t bg_pal0 = (bg_shifter_attrib_lo & bit_mux) > 0;
+		uint8_t bg_pal1 = (bg_shifter_attrib_hi & bit_mux) > 0;
+		bg_palette = (bg_pal1 << 1) | bg_pal0;
+	}
+
+	sprScreen->SetPixel(cycle - 1, scanline, GetColourFromPaletteRam(bg_palette, bg_pixel));
 
 	cycle++;
 	if (cycle >= 341)
@@ -390,5 +509,5 @@ olc::Sprite& olc2C02::GetPatternTable(uint8_t i, uint8_t palette)
 
 olc::Pixel& olc2C02::GetColourFromPaletteRam(uint8_t palette, uint8_t pixel)
 {
-	return palScreen[ppuRead(0x3F00 + (palette << 2) + pixel)];
+	return palScreen[ppuRead(0x3F00 + (palette << 2) + pixel) & 0x3F];
 }
