@@ -17,6 +17,8 @@ Cartridge::Cartridge(const std::string& sFileName)
 		char unused[5];
 	} header;
 
+	bImageValid = false;
+
 	std::ifstream ifs;
 	ifs.open(sFileName, std::ifstream::binary);
 	if (ifs.is_open())
@@ -46,7 +48,14 @@ Cartridge::Cartridge(const std::string& sFileName)
 			ifs.read((char*)vPRGMemory.data(), vPRGMemory.size());
 
 			nCHRBanks = header.chr_rom_chunks;
-			vCHRMemory.resize(nCHRBanks * 8192);
+			if (nCHRBanks == 0)
+			{
+				vCHRMemory.resize(8192);
+			}
+			else
+			{
+				vCHRMemory.resize(nCHRBanks * 8192);
+			}
 			ifs.read((char*)vCHRMemory.data(), vCHRMemory.size());
 		}
 
@@ -58,11 +67,13 @@ Cartridge::Cartridge(const std::string& sFileName)
 		// Load appropriate mapper
 		switch (nMapperID)
 		{
-		case 0:
-			pMapper = std::make_shared<Mapper_000>(nPRGBanks, nCHRBanks);
-			break;
+		case   0: pMapper = std::make_shared<Mapper_000>(nPRGBanks, nCHRBanks); break;
+			//case   2: pMapper = std::make_shared<Mapper_002>(nPRGBanks, nCHRBanks); break;
+			//case   3: pMapper = std::make_shared<Mapper_003>(nPRGBanks, nCHRBanks); break;
+			//case  66: pMapper = std::make_shared<Mapper_066>(nPRGBanks, nCHRBanks); break;
 		}
 
+		bImageValid = true;
 		ifs.close();
 	}
 }
@@ -71,7 +82,12 @@ Cartridge::~Cartridge()
 {
 }
 
-bool Cartridge::cpuRead(uint16_t addr, uint8_t& data)
+bool Cartridge::ImageValid()
+{
+	return bImageValid;
+}
+
+bool Cartridge::cpuRead(uint16_t addr, uint8_t &data)
 {
 	uint32_t mapped_addr = 0;
 	if (pMapper->cpuMapRead(addr, mapped_addr))
@@ -86,9 +102,9 @@ bool Cartridge::cpuRead(uint16_t addr, uint8_t& data)
 bool Cartridge::cpuWrite(uint16_t addr, uint8_t data)
 {
 	uint32_t mapped_addr = 0;
-	if (pMapper->cpuMapRead(addr, mapped_addr))
+	if (pMapper->cpuMapWrite(addr, mapped_addr, data))
 	{
-		vPRGMemory[mapped_addr] = data;;
+		vPRGMemory[mapped_addr] = data;
 		return true;
 	}
 	else
@@ -110,11 +126,17 @@ bool Cartridge::ppuRead(uint16_t addr, uint8_t& data)
 bool Cartridge::ppuWrite(uint16_t addr, uint8_t data)
 {
 	uint32_t mapped_addr = 0;
-	if (pMapper->ppuMapRead(addr, mapped_addr))
+	if (pMapper->ppuMapWrite(addr, mapped_addr))
 	{
-		vCHRMemory[mapped_addr] = data;;
+		vCHRMemory[mapped_addr] = data;
 		return true;
 	}
 	else
 		return false;
+}
+
+void Cartridge::reset()
+{
+	if (pMapper != nullptr)
+		pMapper->reset();
 }

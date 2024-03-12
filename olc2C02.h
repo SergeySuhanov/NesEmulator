@@ -1,4 +1,5 @@
 #pragma once
+#include <cstdint>
 #include<memory>
 #include "Cartridge.h"
 
@@ -33,7 +34,7 @@ public:
 	// Interface
 	void ConnectCartridge(const std::shared_ptr<Cartridge>& cartridge);
 	void clock();
-
+	void reset();
 	bool nmi = false;
 
 private:
@@ -116,7 +117,7 @@ private:
 			uint16_t coarse_y : 5;
 			uint16_t nametable_x : 1;
 			uint16_t nametable_y : 1;
-			uint16_t fine_y : 1;
+			uint16_t fine_y : 3;
 			uint16_t unused : 1;
 		};
 

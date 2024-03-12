@@ -3,7 +3,7 @@
 #include <array>
 #include "olc6502.h"
 #include "olc2C02.h"
-#include <memory>
+//#include <memory>
 
 #include "Cartridge.h"
 
@@ -21,6 +21,8 @@ public: // Devices on bus
 	// The Cartridge or "GamePak"
 	std::shared_ptr<Cartridge> cart;
 
+	uint8_t controller[2];
+
 	// Fake RAM for this part of the series
 	uint8_t cpuRam[2048];
 
@@ -35,5 +37,7 @@ public: // System Interface
 
 private:
 	uint32_t nSystemClockCounter = 0;
+
+	uint8_t controller_state[2];
 };
 

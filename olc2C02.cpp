@@ -1,5 +1,4 @@
 #include "olc2C02.h"
-#include <cstdint>
 
 olc2C02::olc2C02()
 {
@@ -80,7 +79,61 @@ olc2C02::olc2C02()
 
 olc2C02::~olc2C02()
 {
+	delete sprScreen;
+	delete sprNameTable[0];
+	delete sprNameTable[1];
+	delete sprPatternTable[0];
+	delete sprPatternTable[1];
 }
+
+olc::Sprite& olc2C02::GetScreen()
+{
+	return *sprScreen;
+}
+
+olc::Sprite& olc2C02::GetPatternTable(uint8_t i, uint8_t palette)
+{
+	for (uint16_t nTileY = 0; nTileY < 16; nTileY++)
+	{
+		for (uint16_t nTileX = 0; nTileX < 16; nTileX++)
+		{
+			uint16_t nOffset = nTileY * 256 + nTileX * 16;
+
+			for (uint16_t row = 0; row < 8; row++)
+			{
+				uint8_t tile_lsb = ppuRead(i * 0x1000 + nOffset + row);
+				uint8_t tile_msb = ppuRead(i * 0x1000 + nOffset + row + 0x0008);
+
+				for (uint16_t col = 0; col < 8; col++)
+				{
+					uint8_t pixel = (tile_lsb & 0x01) + (tile_msb & 0x01);
+					tile_lsb >>= 1;
+					tile_msb >>= 1;
+
+					sprPatternTable[i]->SetPixel
+					(
+						nTileX * 8 + (7 - col),
+						nTileY * 8 + row,
+						GetColourFromPaletteRam(palette, pixel)
+					);
+				}
+			}
+		}
+	}
+
+	return *sprPatternTable[i];
+}
+
+olc::Pixel& olc2C02::GetColourFromPaletteRam(uint8_t palette, uint8_t pixel)
+{
+	return palScreen[ppuRead(0x3F00 + (palette << 2) + pixel) & 0x3F];
+}
+
+olc::Sprite& olc2C02::GetNameTable(uint8_t i)
+{
+	return *sprNameTable[i];
+}
+
 
 uint8_t olc2C02::cpuRead(uint16_t addr, bool rdonly)
 {
@@ -109,7 +162,7 @@ uint8_t olc2C02::cpuRead(uint16_t addr, bool rdonly)
 		data = ppu_data_buffer;
 		ppu_data_buffer = ppuRead(vram_addr.reg);
 
-		if (vram_addr.reg > 0x3F00) data = ppu_data_buffer;
+		if (vram_addr.reg >= 0x3F00) data = ppu_data_buffer;
 		vram_addr.reg += (control.increment_mode ? 32 : 1);
 		break;
 	}
@@ -152,7 +205,7 @@ void olc2C02::cpuWrite(uint16_t addr, uint8_t data)
 	case 0x0006: // PPU Address
 		if (address_latch == 0)
 		{
-			tram_addr.reg = (tram_addr.reg & 0x00FF) | (uint16_t)((data & 0x3F) << 8);
+			tram_addr.reg = (uint16_t)((data & 0x3F) << 8) | (tram_addr.reg & 0x00FF);
 			address_latch = 1;
 		}
 		else
@@ -277,6 +330,28 @@ void olc2C02::ConnectCartridge(const std::shared_ptr<Cartridge>& cartridge)
 	this->cart = cartridge;
 }
 
+void olc2C02::reset()
+{
+	fine_x = 0x00;
+	address_latch = 0x00;
+	ppu_data_buffer = 0x00;
+	scanline = 0;
+	cycle = 0;
+	bg_next_tile_id = 0x00;
+	bg_next_tile_attrib = 0x00;
+	bg_next_tile_lsb = 0x00;
+	bg_next_tile_msb = 0x00;
+	bg_shifter_pattern_lo = 0x0000;
+	bg_shifter_pattern_hi = 0x0000;
+	bg_shifter_attrib_lo = 0x0000;
+	bg_shifter_attrib_hi = 0x0000;
+	status.reg = 0x00;
+	mask.reg = 0x00;
+	control.reg = 0x00;
+	vram_addr.reg = 0x0000;
+	tram_addr.reg = 0x0000;
+}
+
 void olc2C02::clock()
 {
 	auto IncrementScrollX = [&]()
@@ -300,7 +375,7 @@ void olc2C02::clock()
 		{
 			if (mask.render_background || mask.render_sprites)
 			{
-				if (vram_addr.coarse_y < 7)
+				if (vram_addr.fine_y < 7)
 				{
 					vram_addr.fine_y++;
 				}
@@ -365,6 +440,11 @@ void olc2C02::clock()
 
 	if (scanline >= -1 && scanline < 240)
 	{
+		if (scanline == 0 && cycle == 0)
+		{
+			cycle = 1;
+		}
+
 		if (scanline == -1 && cycle == 1)
 		{
 			status.vertical_blank = 0;
@@ -411,7 +491,13 @@ void olc2C02::clock()
 
 		if (cycle == 257)
 		{
+			LoadBackgroundShifters();
 			TransferAddressX();
+		}
+
+		if (cycle == 338 || cycle == 340)
+		{
+			bg_next_tile_id = ppuRead(0x2000 | (vram_addr.reg & 0x0FFF));
 		}
 
 		if (scanline == -1 && cycle >= 280 && cycle < 305)
@@ -425,13 +511,16 @@ void olc2C02::clock()
 		// Post-Render Scanline - Do Nothing
 	}
 
-	if (scanline == 241 && cycle == 1)
+	if (scanline >= 241 && scanline < 261)
 	{
-		status.vertical_blank = 1;
-		if (control.enable_nmi)
-			nmi = true;
+		if (scanline == 241 && cycle == 1)
+		{
+			status.vertical_blank = 1;
+			if (control.enable_nmi)
+				nmi = true;
+		}
 	}
-
+	
 
 	uint8_t bg_pixel = 0x00;
 	uint8_t bg_palette = 0x00;
@@ -449,7 +538,7 @@ void olc2C02::clock()
 		bg_palette = (bg_pal1 << 1) | bg_pal0;
 	}
 
-	sprScreen->SetPixel(cycle - 1, scanline, GetColourFromPaletteRam(bg_palette, bg_pixel));
+ 	sprScreen->SetPixel(cycle - 1, scanline, GetColourFromPaletteRam(bg_palette, bg_pixel));
 
 	cycle++;
 	if (cycle >= 341)
@@ -464,50 +553,11 @@ void olc2C02::clock()
 	}
 }
 
-olc::Sprite& olc2C02::GetScreen()
-{
-	return *sprScreen;
-}
 
-olc::Sprite& olc2C02::GetNameTable(uint8_t i)
-{
-	return *sprNameTable[i];
-}
 
-olc::Sprite& olc2C02::GetPatternTable(uint8_t i, uint8_t palette)
-{
-	for (uint16_t nTileY = 0; nTileY < 16; nTileY++)
-	{
-		for (uint16_t nTileX = 0; nTileX < 16; nTileX++)
-		{
-			uint16_t nOffset = nTileY * 256 + nTileX * 16;
 
-			for (uint16_t row = 0; row < 8; row++)
-			{
-				uint8_t tile_lsb = ppuRead(i * 0x1000 + nOffset + row);
-				uint8_t tile_msb = ppuRead(i * 0x1000 + nOffset + row + 0x0008);
 
-				for (uint16_t col = 0; col < 8; col++)
-				{
-					uint8_t pixel = (tile_lsb & 0x01) + (tile_msb & 0x01);
-					tile_lsb >>= 1;
-					tile_msb >>= 1;
 
-					sprPatternTable[i]->SetPixel
-					(
-						nTileX * 8 + (7 - col),
-						nTileY * 8 + row,
-						GetColourFromPaletteRam(palette, pixel)
-					);
-				}
-			}
-		}
-	}
 
-	return *sprPatternTable[i];
-}
 
-olc::Pixel& olc2C02::GetColourFromPaletteRam(uint8_t palette, uint8_t pixel)
-{
-	return palScreen[ppuRead(0x3F00 + (palette << 2) + pixel) & 0x3F];
-}
+

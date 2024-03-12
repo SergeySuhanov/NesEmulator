@@ -8,6 +8,10 @@ Mapper_000::~Mapper_000()
 {
 }
 
+void Mapper_000::reset()
+{
+}
+
 bool Mapper_000::cpuMapRead(uint16_t addr, uint32_t& mapped_addr)
 {
     if (addr >= 0x8000 && addr <= 0xFFFF)
@@ -19,7 +23,7 @@ bool Mapper_000::cpuMapRead(uint16_t addr, uint32_t& mapped_addr)
     return false;
 }
 
-bool Mapper_000::cpuMapWrite(uint16_t addr, uint32_t& mapped_addr)
+bool Mapper_000::cpuMapWrite(uint16_t addr, uint32_t& mapped_addr, uint8_t data)
 {
     if (addr >= 0x8000 && addr <= 0xFFFF)
     {
@@ -43,10 +47,15 @@ bool Mapper_000::ppuMapRead(uint16_t addr, uint32_t& mapped_addr)
 
 bool Mapper_000::ppuMapWrite(uint16_t addr, uint32_t& mapped_addr)
 {
-    /*if (addr >= 0x0000 && addr <= 0x1FFF)
+    if (addr >= 0x0000 && addr <= 0x1FFF)
     {
-        return true;
-    }*/
+        if (nCHRBanks == 0)
+        {
+            mapped_addr = addr;
+            return true;
+        }
+    }
 
     return false;
 }
+
