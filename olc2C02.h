@@ -12,8 +12,8 @@ public:
 	olc2C02();
 	~olc2C02();
 
-	uint8_t tblName[2][1024];
 private:
+	uint8_t tblName[2][1024];
 	uint8_t tblPalette[32];
 	uint8_t tblPattern[2][4096];  // Javid Future Custom Mapper 
 
@@ -138,5 +138,19 @@ private:
 	uint16_t bg_shifter_pattern_hi = 0x0000;
 	uint16_t bg_shifter_attrib_lo = 0x0000;
 	uint16_t bg_shifter_attrib_hi = 0x0000;
+
+private:
+	struct sObjectAttributeEntry
+	{
+		uint8_t y;          // Y position of sprite
+		uint8_t id;         // ID of tile from pattern memory
+		uint8_t attribute;  // Flags define how sprite should be rendered
+		uint8_t x;          // X position of sprite
+	} OAM[64];
+
+public:
+	uint8_t* pOAM = (uint8_t*)OAM;
+
+	uint8_t oam_addr = 0x00;
 };
 

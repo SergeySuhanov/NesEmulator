@@ -106,7 +106,7 @@ olc::Sprite& olc2C02::GetPatternTable(uint8_t i, uint8_t palette)
 
 				for (uint16_t col = 0; col < 8; col++)
 				{
-					uint8_t pixel = (tile_lsb & 0x01) + (tile_msb & 0x01);
+					uint8_t pixel = ((tile_lsb & 0x01) << 1) | (tile_msb & 0x01);
 					tile_lsb >>= 1;
 					tile_msb >>= 1;
 
@@ -153,6 +153,7 @@ uint8_t olc2C02::cpuRead(uint16_t addr, bool rdonly)
 	case 0x0003: // OAM Address
 		break;
 	case 0x0004: // OAM Data
+		data = pOAM[oam_addr];
 		break;
 	case 0x0005: // Scroll
 		break;
@@ -185,8 +186,10 @@ void olc2C02::cpuWrite(uint16_t addr, uint8_t data)
 	case 0x0002: // Status
 		break;
 	case 0x0003: // OAM Address
+		oam_addr = data;
 		break;
 	case 0x0004: // OAM Data
+		pOAM[oam_addr] = data;
 		break;
 	case 0x0005: // Scroll
 		if (address_latch == 0)
@@ -478,6 +481,7 @@ void olc2C02::clock()
 				bg_next_tile_msb = ppuRead((control.pattern_background << 12)
 					+ ((uint16_t)bg_next_tile_id << 4)
 					+ (vram_addr.fine_y) + 8);
+				break;
 			case 7:
 				IncrementScrollX();
 				break;
