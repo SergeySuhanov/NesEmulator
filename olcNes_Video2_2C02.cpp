@@ -61,7 +61,7 @@
 #include "olc6502.h"
 
 #define OLC_PGE_APPLICATION
-#include "olcPixelGameEngine.h"
+#include "olcPixelGameEngineV1_24.h"
 
 
 
@@ -161,7 +161,7 @@ private:
 	bool OnUserCreate()
 	{
 		// Load the cartridge
-		cart = std::make_shared<Cartridge>("DonkeyKong.nes");
+		cart = std::make_shared<Cartridge>("SuperMarioBros.nes");
 
 		if (!cart->ImageValid())
 			return false;

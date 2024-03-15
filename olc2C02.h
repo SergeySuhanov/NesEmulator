@@ -3,7 +3,7 @@
 #include<memory>
 #include "Cartridge.h"
 
-#include "olcPixelGameEngine.h"
+#include "olcPixelGameEngineV1_24.h"
 
 class olc2C02
 {
@@ -154,6 +154,9 @@ private:
 	uint8_t sprite_count;
 	uint8_t sprite_shifter_pattern_lo[8];
 	uint8_t sprite_shifter_pattern_hi[8];
+
+	bool bSpriteZeroHitPossible = false;
+	bool bSpriteZeroBeingRendered = false;
 
 public:
 	uint8_t* pOAM = (uint8_t*)OAM;
